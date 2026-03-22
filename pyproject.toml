@@ -1,0 +1,18 @@
+[project]
+name = "sims4filter"
+version = "1.0.0"
+description = "Filtering for Sims 4"
+license = {text = "ISC"}
+keywords = ["sims4", "logic", "functional"]
+requires-python = ">=3.7, <3.8"
+authors = [
+  {name = "epsilon-0", email = "epsilon@epsilonknot.xyz"},
+]
+classifiers = [
+  "Programming Language :: Python"
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.14.1",
+]

@@ -1,0 +1,89 @@
+name: Release Sims 4 Mod
+
+on:
+  push:
+    tags:
+      - '*'
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  MOD_NAME: sims4filter
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.7
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.7'
+
+      - name: Compile Python files to bytecode
+        run: |
+          python -m compileall -b scripts/
+
+      - name: Create bytecode archive
+        shell: pwsh
+        run: |
+          $pycFiles = Get-ChildItem -Path scripts -Recurse -Filter "*.pyc"
+          New-Item -ItemType Directory -Force -Path "bytecode_dist"
+          
+          foreach ($file in $pycFiles) {
+            $relPath = $file.FullName.Substring((Get-Location).Path.Length + 9)  # +9 for "\scripts\"
+            $newPath = $relPath -replace '\\__pycache__\\', '\' -replace '\.cpython-\d+\.pyc', '.pyc'
+            $destDir = Join-Path "bytecode_dist" (Split-Path $newPath -Parent)
+            New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+            Copy-Item $file.FullName -Destination (Join-Path "bytecode_dist" $newPath)
+          }
+          
+          Set-Location "bytecode_dist/${{ env.MOD_NAME }}"
+          Compress-Archive -Path * -DestinationPath "../../${{ env.MOD_NAME }}.zip"
+          Set-Location "../.."
+          Rename-Item "${{ env.MOD_NAME }}.zip" "${{ env.MOD_NAME }}.ts4script"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ env.MOD_NAME }}
+          path: ${{ env.MOD_NAME }}.ts4script
+
+      - name: Get latest tag
+        id: tag
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "push") {
+            $timestamp = Get-Date -Format "yyyyddMMHHmmss"
+            echo "tag=latest-$timestamp" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "tag=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Update latest tag
+        if: github.event_name == 'push'
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          $tagName = "${{ steps.tag.outputs.tag }}"
+          git tag -f $tagName
+          git push origin $tagName --force
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.tag }}
+          name: Release ${{ steps.tag.outputs.tag }}
+          files: ${{ env.MOD_NAME }}.ts4script
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
