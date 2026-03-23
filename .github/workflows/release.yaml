@@ -57,19 +57,22 @@ jobs:
           name: ${{ env.MOD_NAME }}
           path: ${{ env.MOD_NAME }}.ts4script
 
-      - name: Get latest tag
+      - name: Get tag name
         id: tag
         shell: pwsh
         run: |
-          if ("${{ github.event_name }}" -eq "push") {
-            $timestamp = Get-Date -Format "yyyyddMMHHmmss"
-            echo "tag=latest-$timestamp" >> $env:GITHUB_OUTPUT
-          } else {
+          $refType = "${{ github.ref_type }}"
+          if ($refType -eq "tag") {
             echo "tag=${{ github.ref_name }}" >> $env:GITHUB_OUTPUT
+            echo "is_tag=true" >> $env:GITHUB_OUTPUT
+          } else {
+            $timestamp = Get-Date -Format "yyyyMMddHHmmss"
+            echo "tag=latest-$timestamp" >> $env:GITHUB_OUTPUT
+            echo "is_tag=false" >> $env:GITHUB_OUTPUT
           }
 
-      - name: Update latest tag
-        if: github.event_name == 'push'
+      - name: Create tag for non-tag push
+        if: steps.tag.outputs.is_tag == 'false'
         shell: pwsh
         run: |
           git config user.name "github-actions[bot]"
@@ -84,7 +87,7 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: Release ${{ steps.tag.outputs.tag }}
           files: ${{ env.MOD_NAME }}.ts4script
-          prerelease: ${{ github.event_name == 'push' }}
+          prerelease: ${{ steps.tag.outputs.is_tag == 'false' }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
