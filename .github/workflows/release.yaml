@@ -84,6 +84,7 @@ jobs:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: Release ${{ steps.tag.outputs.tag }}
           files: ${{ env.MOD_NAME }}.ts4script
+          prerelease: ${{ github.event_name == 'push' }}
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
